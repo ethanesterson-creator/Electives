@@ -382,8 +382,6 @@ if have_all_files:
                 mime="text/csv",
             )
 
-            )
-
             st.subheader("Elective Capacity Usage")
             elective_usage = (
                 elective_rosters.groupby(["elective_id", "elective_name"])
