@@ -261,7 +261,7 @@ slots_per_camper = st.sidebar.number_input(
     "Electives per camper per day",
     min_value=1,
     max_value=5,
-    value=3,
+    value=2,
     step=1,
 )
 seed = st.sidebar.number_input(
