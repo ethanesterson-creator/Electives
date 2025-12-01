@@ -372,8 +372,7 @@ if sort_cols:
 
 st.dataframe(elective_rosters)
 
-
-            csv_rosters = elective_rosters.to_csv(index=False).encode("utf-8")
+csv_rosters = elective_rosters.to_csv(index=False).encode("utf-8")
             st.download_button(
                 "Download elective rosters CSV",
                 data=csv_rosters,
