@@ -94,7 +94,7 @@ def run_matching(campers_df, ballots_df, electives_df, slots_per_camper=3, seed=
         rank_cols_sorted = sorted(rank_cols, key=lambda x: int(x.split("_")[1]))
 
         for rank_idx, rank_col in enumerate(rank_cols_sorted, start=1):
-            # Optionally, fairness enhancement:
+            # Fairness enhancement:
             # sort campers by worst best_rank (None considered high)
             def camper_sort_key(cid):
                 best = camper_state[cid]["best_rank"]
@@ -190,6 +190,54 @@ def compute_summary(assignments_df, ballots_df):
 
 
 # --------------------------
+# Template generators
+# --------------------------
+def get_template_campers():
+    data = [
+        ["C001", "Jake", "Rosen", "Bunk 1", "Freshman"],
+        ["C002", "Noah", "Levy", "Bunk 3", "Sophomore"],
+        ["C003", "Eli", "Klein", "Bunk 11", "Junior"],
+        ["C004", "Max", "Gold", "Bunk 19", "Senior"],
+        ["C005", "Sam", "Fisher", "Bunk 18", "Waiter"],
+        ["C006", "Ben", "Cohen", "Bunk 20", "CI"],
+    ]
+    cols = ["camper_id", "first_name", "last_name", "bunk", "age_group"]
+    return pd.DataFrame(data, columns=cols)
+
+
+def get_template_electives():
+    data = [
+        ["WF", "Waterfront", 60, 1, 6],
+        ["BB", "Basketball", 40, 1, 6],
+        ["TEN", "Tennis", 24, 2, 6],
+        ["ART", "Arts & Crafts", 30, 1, 6],
+        ["CRD", "Cards & Reading", 25, 1, 6],
+        ["FIT", "Fitness", 30, 3, 6],
+    ]
+    cols = [
+        "elective_id",
+        "elective_name",
+        "daily_capacity",
+        "min_age_group_rank",
+        "max_age_group_rank",
+    ]
+    return pd.DataFrame(data, columns=cols)
+
+
+def get_template_ballots():
+    data = [
+        ["C001", "WF", "BB", "TEN", "ART", "CRD", "FIT"],
+        ["C002", "WF", "TEN", "BB", "FIT", "CRD", "ART"],
+        ["C003", "BB", "WF", "TEN", "FIT", "ART", "CRD"],
+        ["C004", "FIT", "BB", "WF", "TEN", "ART", "CRD"],
+        ["C005", "WF", "FIT", "BB", "CRD", "ART", "TEN"],
+        ["C006", "TEN", "WF", "FIT", "BB", "ART", "CRD"],
+    ]
+    cols = ["camper_id", "rank_1", "rank_2", "rank_3", "rank_4", "rank_5", "rank_6"]
+    return pd.DataFrame(data, columns=cols)
+
+
+# --------------------------
 # UI
 # --------------------------
 
@@ -231,7 +279,9 @@ campers_file = st.file_uploader("Upload campers.csv", type=["csv"])
 ballots_file = st.file_uploader("Upload ballots.csv", type=["csv"])
 electives_file = st.file_uploader("Upload electives.csv", type=["csv"])
 
-if campers_file and ballots_file and electives_file:
+have_all_files = campers_file is not None and ballots_file is not None and electives_file is not None
+
+if have_all_files:
     campers_df = pd.read_csv(campers_file)
     ballots_df = pd.read_csv(ballots_file)
     electives_df = pd.read_csv(electives_file)
@@ -334,4 +384,54 @@ if campers_file and ballots_file and electives_file:
             st.dataframe(elective_usage)
 
 else:
-    st.info("Upload campers.csv, ballots.csv, and electives.csv to begin.")
+    st.info(
+        "Upload campers.csv, ballots.csv, and electives.csv to run the matcher. "
+        "Or download editable templates below to get started."
+    )
+
+    st.header("📁 CSV Templates")
+
+    tmpl_campers = get_template_campers()
+    tmpl_ballots = get_template_ballots()
+    tmpl_electives = get_template_electives()
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.subheader("campers.csv template")
+        st.caption("Required columns: camper_id, first_name, last_name, bunk, age_group")
+        st.dataframe(tmpl_campers)
+        campers_csv = tmpl_campers.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download campers.csv template",
+            data=campers_csv,
+            file_name="campers_template.csv",
+            mime="text/csv",
+        )
+
+    with c2:
+        st.subheader("ballots.csv template")
+        st.caption("Required columns: camper_id, rank_1, rank_2, rank_3, rank_4, rank_5, rank_6")
+        st.dataframe(tmpl_ballots)
+        ballots_csv = tmpl_ballots.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download ballots.csv template",
+            data=ballots_csv,
+            file_name="ballots_template.csv",
+            mime="text/csv",
+        )
+
+    st.subheader("electives.csv template")
+    st.caption(
+        "Required columns: elective_id, elective_name, daily_capacity, "
+        "min_age_group_rank, max_age_group_rank "
+        "(1=Freshman, 2=Sophomore, 3=Junior, 4=Senior, 5=Waiter, 6=CI)"
+    )
+    st.dataframe(tmpl_electives)
+    electives_csv = tmpl_electives.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "Download electives.csv template",
+        data=electives_csv,
+        file_name="electives_template.csv",
+        mime="text/csv",
+    )
