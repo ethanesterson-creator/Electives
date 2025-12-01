@@ -353,31 +353,35 @@ if have_all_files:
                 file_name="camper_assignments.csv",
                 mime="text/csv",
             )
-
+                        
             st.subheader("Rosters by Elective")
 
-# Merge camper info onto assignments
-elective_rosters = assignments_df.merge(
-    campers_df[["camper_id", "first_name", "last_name", "bunk", "age_group"]],
-    on="camper_id",
-    how="left",
-)
+            # Merge camper info onto assignments
+            elective_rosters = assignments_df.merge(
+                campers_df[["camper_id", "first_name", "last_name", "bunk", "age_group"]],
+                on="camper_id",
+                how="left",
+            )
 
-# Only sort by columns that actually exist (avoids KeyError)
-sort_cols = [c for c in ["elective_name", "age_group", "bunk", "last_name"]
-             if c in elective_rosters.columns]
+            # Only sort by columns that actually exist (avoids KeyError)
+            sort_cols = []
+            for col in ["elective_name", "age_group", "bunk", "last_name"]:
+                if col in elective_rosters.columns:
+                    sort_cols.append(col)
 
-if sort_cols:
-    elective_rosters = elective_rosters.sort_values(sort_cols)
+            if sort_cols:
+                elective_rosters = elective_rosters.sort_values(sort_cols)
 
-st.dataframe(elective_rosters)
+            st.dataframe(elective_rosters)
 
-csv_rosters = elective_rosters.to_csv(index=False).encode("utf-8")
+            csv_rosters = elective_rosters.to_csv(index=False).encode("utf-8")
             st.download_button(
                 "Download elective rosters CSV",
                 data=csv_rosters,
                 file_name="elective_rosters.csv",
                 mime="text/csv",
+            )
+
             )
 
             st.subheader("Elective Capacity Usage")
