@@ -356,13 +356,22 @@ if have_all_files:
 
             st.subheader("Rosters by Elective")
 
-            elective_rosters = assignments_df.merge(
-                campers_df[["camper_id", "first_name", "last_name", "bunk", "age_group"]],
-                on="camper_id",
-                how="left",
-            ).sort_values(["elective_name", "age_group", "bunk", "last_name"])
+# Merge camper info onto assignments
+elective_rosters = assignments_df.merge(
+    campers_df[["camper_id", "first_name", "last_name", "bunk", "age_group"]],
+    on="camper_id",
+    how="left",
+)
 
-            st.dataframe(elective_rosters)
+# Only sort by columns that actually exist (avoids KeyError)
+sort_cols = [c for c in ["elective_name", "age_group", "bunk", "last_name"]
+             if c in elective_rosters.columns]
+
+if sort_cols:
+    elective_rosters = elective_rosters.sort_values(sort_cols)
+
+st.dataframe(elective_rosters)
+
 
             csv_rosters = elective_rosters.to_csv(index=False).encode("utf-8")
             st.download_button(
