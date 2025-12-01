@@ -35,6 +35,22 @@ CUSTOM_CSS = f"""
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+# --------------------------
+# Header with Bauercrest logo
+# --------------------------
+cols = st.columns([1, 4])
+
+with cols[0]:
+    try:
+        st.image("assets/logo-header-2.png", use_container_width=True)
+    except Exception as e:
+        st.write("Logo could not be loaded.")
+        st.write(e)
+
+with cols[1]:
+    st.title("Bauercrest Electives Ballot Matcher")
+    st.subheader("Preference-based elective assignments — periods handled elsewhere")
+
 
 # --------------------------
 # Helper constants
