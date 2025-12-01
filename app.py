@@ -256,7 +256,7 @@ with cols[0]:
 
 with cols[1]:
     st.title("Bauercrest Electives Ballot Matcher")
-    st.subheader("Preference-based elective assignments — periods handled elsewhere")
+    st.subheader("Preference-based elective assignments")
 
 
 st.markdown("---")
