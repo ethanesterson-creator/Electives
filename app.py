@@ -49,7 +49,7 @@ with cols[0]:
 
 with cols[1]:
     st.title("Bauercrest Electives Matcher")
-    st.subheader("Assign electives based on ranked ballots)
+    st.subheader("Assign electives based on ranked ballots")
 
 st.markdown("---")
 
