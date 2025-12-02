@@ -49,7 +49,7 @@ with cols[0]:
 
 with cols[1]:
     st.title("Bauercrest Electives Matcher")
-    st.subheader("Assign electives based on ranked ballots — periods handled automatically")
+    st.subheader("Assign electives based on ranked ballots)
 
 st.markdown("---")
 
@@ -61,7 +61,7 @@ slots_per_camper = st.sidebar.number_input(
     "Electives per camper per day",
     min_value=1,
     max_value=5,
-    value=3,
+    value=2,
     step=1,
 )
 seed = st.sidebar.number_input(
