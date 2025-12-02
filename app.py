@@ -77,10 +77,10 @@ seed = st.sidebar.number_input(
 def template_campers_df():
     return pd.DataFrame({
         "camper_id": ["C001", "C002"],
-        "first_name": ["Jake", "Noah"],
-        "last_name": ["Rosen", "Levy"],
-        "bunk": ["Bunk 1", "Bunk 3"],
-        "age_group": ["Freshman", "Junior"],
+        "first_name": ["Gavin", "Riley"],
+        "last_name": ["Orloff", "Gravelese"],
+        "bunk": ["Bunk 16", "Bunk 16"],
+        "age_group": ["Junior", "Junior"],
     })
 
 def template_electives_df():
