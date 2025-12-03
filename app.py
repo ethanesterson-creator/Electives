@@ -77,33 +77,89 @@ seed = st.sidebar.number_input(
 def template_campers_df():
     return pd.DataFrame({
         "camper_id": ["C001", "C002"],
-        "first_name": ["John", "Jack"],
-        "last_name": ["Doe", "Smith"],
-        "bunk": ["Bunk 4", "Bunk 16"],
-        "age_group": ["Sophmore", "Junior"],
+        "first_name": ["Jake", "Noah"],
+        "last_name": ["Rosen", "Levy"],
+        "bunk": ["Bunk 1", "Bunk 3"],
+        "age_group": ["Freshman", "Junior"],
     })
 
 def template_electives_df():
     return pd.DataFrame({
-        "elective_id": ["WF", "BB", "ART"],
-        "elective_name": ["Waterfront", "Basketball", "Arts & Crafts"],
-        "cycle_capacity": [80, 40, 40],
+        "elective_id": ["WBK", "BBSK", "FWTB"],
+        "elective_name": ["Wakeboarding", "Basketball Skills", "Fun with the Boys"],
+        "cycle_capacity": [40, 40, 60],
     })
 
 def template_ballots_df():
     return pd.DataFrame({
         "camper_id": ["C001", "C002"],
-        "rank_1": ["WF", "WF"],
-        "rank_2": ["BB", "ART"],
-        "rank_3": ["ART", "BB"],
-        "rank_4": ["DM", "WF"],
-        "rank_5": ["SBL", "DM"],
-        "rank_6": ["GF", "SBL"],
-        "rank_7": ["NJA", "GF"],
-        "rank_8": ["WW", "NJA"],
-        "rank_9": ["DIY", "WW"],
-        "rank_10": ["CRD", "DIY"],
+        "rank_1": ["WBK", "WSK"],
+        "rank_2": ["BBSK", "TUB"],
+        "rank_3": ["FWTB", "SAIL"],
+        "rank_4": ["SOCC", "BBSK"],
+        "rank_5": ["DM", "NJA"],
+        "rank_6": ["PHOT", "DM"],
+        "rank_7": ["YRBK", "IMPR"],
+        "rank_8": ["ULT", "GLF"],
+        "rank_9": ["WOOD", "CERM"],
+        "rank_10": ["CMPC", "FWTB"],
     })
+
+# -------------------------------------------------------------------
+# Helper: compute satisfaction stats & problem campers
+# -------------------------------------------------------------------
+def compute_preference_stats(camper_ids, camper_state, ballot_map):
+    records = []
+    for cid in camper_ids:
+        assigned = camper_state[cid]["assigned"]
+        prefs = [str(p).strip() for p in ballot_map[cid] if not pd.isna(p) and str(p).strip() != ""]
+        ranks = []
+        for e in assigned:
+            if e in prefs:
+                ranks.append(prefs.index(e) + 1)  # 1-based rank
+        best_rank = min(ranks) if ranks else None
+        records.append({
+            "camper_id": cid,
+            "assigned_count": len(assigned),
+            "best_rank": best_rank,
+            "ranks": ranks,
+        })
+
+    n = len(records)
+    if n == 0:
+        return {}, pd.DataFrame()
+
+    got_rank1 = sum(1 for r in records if r["best_rank"] == 1)
+    got_top3 = sum(1 for r in records if r["best_rank"] is not None and r["best_rank"] <= 3)
+    got_top5 = sum(1 for r in records if r["best_rank"] is not None and r["best_rank"] <= 5)
+
+    best_ranks_nonnull = [r["best_rank"] for r in records if r["best_rank"] is not None]
+    avg_best = sum(best_ranks_nonnull) / len(best_ranks_nonnull) if best_ranks_nonnull else None
+    avg_assigned = sum(r["assigned_count"] for r in records) / n
+
+    stats = {
+        "n_campers": n,
+        "pct_got_rank1": 100.0 * got_rank1 / n,
+        "pct_got_top3": 100.0 * got_top3 / n,
+        "pct_got_top5": 100.0 * got_top5 / n,
+        "avg_best_rank": avg_best,
+        "avg_assigned": avg_assigned,
+    }
+
+    # Problem campers: fewer than TOTAL_ELECTIVES_PER_CAMPER assigned
+    problem_rows = [
+        {
+            "camper_id": r["camper_id"],
+            "assigned_count": r["assigned_count"],
+            "missing_slots": TOTAL_ELECTIVES_PER_CAMPER - r["assigned_count"],
+            "best_rank": r["best_rank"],
+        }
+        for r in records
+        if r["assigned_count"] < TOTAL_ELECTIVES_PER_CAMPER
+    ]
+    problem_df = pd.DataFrame(problem_rows)
+
+    return stats, problem_df
 
 # -------------------------------------------------------------------
 # File Uploads
@@ -165,14 +221,11 @@ else:
     with st.expander("electives.csv"):
         st.dataframe(electives_df.head())
 
-    # -------------------------------------------------------------------
     # Validate campers.csv
-    # -------------------------------------------------------------------
     required_camper_cols = {"camper_id", "first_name", "last_name", "bunk", "age_group"}
     if not required_camper_cols.issubset(set(campers_df.columns)):
         st.error(f"campers.csv must contain columns: {sorted(required_camper_cols)}")
     else:
-        # Rank columns
         rank_cols = [c for c in ballots_df.columns if c.startswith("rank_")]
         if len(rank_cols) < 10:
             st.warning("ballots.csv currently has fewer than 10 rank_* columns. The matcher will use whatever exists.")
@@ -187,9 +240,7 @@ else:
             merged = pd.merge(ballots_df, campers_df, on="camper_id", how="inner")
             camper_ids = merged["camper_id"].unique().tolist()
 
-            # -----------------------------------------------------------
-            # Demand per elective (how many ballots mention it anywhere)
-            # -----------------------------------------------------------
+            # Demand per elective
             demand_counts = {}
             for _, row in ballots_df.iterrows():
                 for col in rank_cols:
@@ -212,48 +263,42 @@ else:
                     st.stop()
 
             electives_df["cycle_capacity"] = electives_df["cycle_capacity"].astype(int)
-            electives_df["demand"] = electives_df["elective_id"].apply(
-                lambda e: demand_counts.get(e, 0)
-            )
+            electives_df["demand"] = electives_df["elective_id"].apply(lambda e: demand_counts.get(e, 0))
 
-            # Capacities per cycle — same capacity each cycle
-            capacities = {
-                cycle: {
-                    row["elective_id"]: row["cycle_capacity"]
-                    for _, row in electives_df.iterrows()
-                }
-                for cycle in range(1, NUM_CYCLES + 1)
-            }
+            # Capacities per cycle, compressing electives into as few cycles as needed
+            capacities = {cycle: {} for cycle in range(1, NUM_CYCLES + 1)}
+            for _, row in electives_df.iterrows():
+                e = row["elective_id"]
+                cap = row["cycle_capacity"]
+                demand = row["demand"]
+                if cap <= 0:
+                    continue
+                cycles_needed = min(NUM_CYCLES, max(1, ceil(demand / cap))) if demand > 0 else 1
+                for cycle in range(1, cycles_needed + 1):
+                    capacities[cycle][e] = cap
 
             # Assignment state
             camper_state = {
                 cid: {
-                    "assigned": [],  # electives across all cycles
+                    "assigned": [],
                     "by_cycle": {cycle: [] for cycle in range(1, NUM_CYCLES + 1)},
                 }
                 for cid in camper_ids
             }
 
-            # Map camper_id -> their ballot preference list (in rank order)
             ballot_map = {
                 cid: [merged[merged["camper_id"] == cid].iloc[0][col] for col in rank_cols]
                 for cid in camper_ids
             }
 
-            # -----------------------------------------------------------
             # Main assignment loop
-            #  For each cycle and slot, walk through campers in random order
-            #  and try to give them the best remaining elective.
-            # -----------------------------------------------------------
             for cycle in range(1, NUM_CYCLES + 1):
                 for slot in range(ELECTIVES_PER_DAY):
                     order = camper_ids.copy()
                     rng.shuffle(order)
-
                     for cid in order:
                         if len(camper_state[cid]["by_cycle"][cycle]) >= ELECTIVES_PER_DAY:
                             continue
-
                         prefs = ballot_map[cid]
                         for pref in prefs:
                             if pd.isna(pref):
@@ -265,18 +310,14 @@ else:
                                 continue
                             if capacities[cycle][elective_id] <= 0:
                                 continue
-                            # camper can't repeat the same elective across cycles
                             if elective_id in camper_state[cid]["assigned"]:
                                 continue
-
                             camper_state[cid]["assigned"].append(elective_id)
                             camper_state[cid]["by_cycle"][cycle].append(elective_id)
                             capacities[cycle][elective_id] -= 1
-                            break  # move on to next camper
+                            break
 
-            # -----------------------------------------------------------
-            # Build camper-cycle assignment table
-            # -----------------------------------------------------------
+            # Camper-cycle assignment table
             assignment_rows = []
             for cid in camper_ids:
                 row = {"camper_id": cid}
@@ -296,9 +337,37 @@ else:
 
             st.success("3-cycle elective assignments generated!")
 
+            # Preference satisfaction stats & problem campers
+            stats, problem_df = compute_preference_stats(camper_ids, camper_state, ballot_map)
+
+            st.subheader("Preference Satisfaction Summary")
+            if stats:
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Campers", stats["n_campers"])
+                c2.metric("Got ≥1 #1 choice", f"{stats['pct_got_rank1']:.1f}%")
+                c3.metric("Got ≥1 Top 3", f"{stats['pct_got_top3']:.1f}%")
+                c4.metric("Got ≥1 Top 5", f"{stats['pct_got_top5']:.1f}%")
+                st.caption(
+                    f"Average best rank: {stats['avg_best_rank']:.2f} | "
+                    f"Average electives assigned: {stats['avg_assigned']:.2f} (max {TOTAL_ELECTIVES_PER_CAMPER})"
+                )
+            else:
+                st.write("No stats available.")
+
+            st.subheader("Campers with fewer than 6 electives")
+            if problem_df.empty:
+                st.success("All campers received 6 electives from their ballots.")
+            else:
+                problem_df = problem_df.merge(
+                    campers_df[["camper_id", "first_name", "last_name", "bunk", "age_group"]],
+                    on="camper_id",
+                    how="left",
+                )
+                st.warning("Some campers have fewer than 6 electives. Review and adjust capacities/ballots.")
+                st.dataframe(problem_df)
+
             st.subheader("Camper Cycle Overview")
             st.dataframe(camper_cycles_df)
-
             st.download_button(
                 "Download camper cycle assignments CSV",
                 camper_cycles_df.to_csv(index=False).encode("utf-8"),
@@ -306,12 +375,9 @@ else:
                 mime="text/csv",
             )
 
-            # -----------------------------------------------------------
-            # Build cycle rosters
-            # -----------------------------------------------------------
+            # Cycle rosters
             roster_rows = []
             elec_name_map = dict(zip(electives_df["elective_id"], electives_df["elective_name"]))
-
             for _, row in camper_cycles_df.iterrows():
                 cid = row["camper_id"]
                 for cycle in range(1, NUM_CYCLES + 1):
@@ -329,7 +395,6 @@ else:
                                 "bunk": row["bunk"],
                                 "age_group": row["age_group"],
                             })
-
             cycle_rosters_df = pd.DataFrame(roster_rows)
             if not cycle_rosters_df.empty:
                 cycle_rosters_df = cycle_rosters_df.sort_values(
